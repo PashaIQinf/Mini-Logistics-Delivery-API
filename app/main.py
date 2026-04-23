@@ -24,7 +24,7 @@ async def lifespan(fastapi_app: FastAPI):
     # Код здесь выполнится ПРИ ОСТАНОВКЕ (например, можно закрыть соединения)
     await engine.dispose()
 
-app = FastAPI(title="Mini-Logistics Vladivostok API", lifespan=lifespan)
+app = FastAPI(title="Mini-Logistics Delivery API", lifespan=lifespan)
 
 
 # --- ЗАВИСИМОСТЬ (Dependency Injection) ---

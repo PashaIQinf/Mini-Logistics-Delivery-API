@@ -47,7 +47,7 @@ async def register_user(user: schemas.UserCreate, db: AsyncSession = Depends(get
     return await crud.create_user(db=db, user=user)
 
 
-@app.get("/products/", response_model=List[schemas.ProductOut] , tags=["Products"])
+@app.get("/products/", response_model=List[schemas.ProductOut], tags=["Products"])
 async def read_products(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)):
     products = await crud.get_products(db, skip=skip, limit=limit)
     return products
@@ -56,3 +56,11 @@ async def read_products(skip: int = 0, limit: int = 100, db: AsyncSession = Depe
 @app.post("/products/", response_model=schemas.ProductOut, tags=["Products"])
 async def create_product(product: schemas.ProductCreate, db: AsyncSession = Depends(get_db)):
     return await crud.create_product(db=db, product=product)
+
+@app.get("/departaments/", response_model=List[schemas.DepartamentOut], tags=["Departaments"])
+async def read_departaments(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)):
+    departaments = await crud.get_departaments(db, skip=skip, limit=limit)
+    return departaments
+@app.post("/departaments/", response_model=schemas.DepartamentOut, tags=["Departaments"])
+async def create_departament(departament: schemas.DepartamentCreate, db: AsyncSession = Depends(get_db)):
+    return await crud.create_departament(db=db,departament=departament)

@@ -22,6 +22,10 @@ class ProductBase(BaseModel):
     description: str
     price: Decimal = Field(..., gt=0)
     weight: Optional[Decimal] = Field(None, ge=0)
+class DepartamentBase(BaseModel):
+    name: str = Field(..., min_length=2, max_length=100)
+    code: str = Field(..., min_length=2, max_length=3, pattern=r"\b[A-ZА-ЯЁ]+\b")
+    is_active: bool
 
 # --- СХЕМЫ ДЛЯ СОЗДАНИЯ (Create) ---
 
@@ -46,6 +50,9 @@ class OrderCreate(BaseModel):
     address_to: str
     price: Decimal = Field(..., gt=0)
     items: List[OrderItemCreate]
+
+class DepartamentCreate(DepartamentBase):
+    pass
 
 # --- СХЕМЫ ДЛЯ ВЫВОДА (Out / Read) ---
 
@@ -79,3 +86,9 @@ class OrderOut(BaseModel):
     courier_id: Optional[uuid.UUID]
 
     model_config = ConfigDict(from_attributes=True)
+class DepartamentOut(DepartamentBase):
+    id: uuid.UUID
+
+    model_config = ConfigDict(from_attributes=True)
+
+

@@ -87,3 +87,16 @@ async def create_order(db: AsyncSession, order_data: schemas.OrderCreate, user_i
     await db.commit()
     await db.refresh(new_order)
     return new_order
+
+# --- РАБОТА С ДЕПАРТАМЕНТАМИ    ---
+async def create_departament(db:AsyncSession, departament: schemas.DepartamentCreate):
+    data = departament.model_dump()
+    db_departament = models.Departaments(**data)
+    db.add(db_departament)
+    await db.commit()
+    await db.refresh(db_departament)
+    return db_departament
+
+async def get_departaments(db: AsyncSession, skip: int = 0, limit: int = 100):
+    result = await db.execute(select(models.Departaments).offset(skip).limit(limit))
+    return result.scalars().all()

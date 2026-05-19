@@ -13,3 +13,8 @@ async_session_maker = async_sessionmaker(bind=engine, class_=AsyncSession,  expi
 # 4. Базовый класс для моделей (в стиле 2.0)
 class Base(DeclarativeBase):
     pass
+
+# 5. Эта функция будет создавать сессию для каждого запроса и закрывать её после
+async def get_db():
+    async with async_session_maker() as session:
+        yield session 

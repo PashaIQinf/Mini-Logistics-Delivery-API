@@ -1,11 +1,12 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+
 
 # Импортируем всё наше "лего"
-from .database import engine, Base, async_session_maker
-from . import models, schemas, crud
+from .database import engine, Base
+
+from app.routers import users, products, departaments
 
 
 # 1. Создаем Lifespan функцию
@@ -26,41 +27,12 @@ async def lifespan(fastapi_app: FastAPI):
 
 app = FastAPI(title="Mini-Logistics Delivery API", lifespan=lifespan)
 
+app.include_router(users.router)
+app.include_router(products.router)
+app.include_router(departaments.router)
 
-# --- ЗАВИСИМОСТЬ (Dependency Injection) ---
-# Эта функция будет создавать сессию для каждого запроса и закрывать её после
-async def get_db():
-    async with async_session_maker() as session:
-        yield session
-
-
-# --- ПЕРВЫЕ ЭНДПОИНТЫ (Маршруты) ---
-
-@app.post("/users/", response_model=schemas.UserOut, status_code=status.HTTP_201_CREATED, tags=["Users"])
-async def register_user(user: schemas.UserCreate, db: AsyncSession = Depends(get_db)):
-    # 1. Проверяем, нет ли уже юзера с таким email
-    db_user = await crud.get_user_by_email(db, email=user.email)
-    if db_user:
-        raise HTTPException(status_code=400, detail="Email уже зарегистрирован")
-
-    # 2. Создаем нового юзера
-    return await crud.create_user(db=db, user=user)
+@app.get("/", tags=["Root/Health"])
+async def root():
+    return {"message": "Система логистики работает, роутеры подключены!"}
 
 
-@app.get("/products/", response_model=List[schemas.ProductOut], tags=["Products"])
-async def read_products(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)):
-    products = await crud.get_products(db, skip=skip, limit=limit)
-    return products
-
-
-@app.post("/products/", response_model=schemas.ProductOut, tags=["Products"])
-async def create_product(product: schemas.ProductCreate, db: AsyncSession = Depends(get_db)):
-    return await crud.create_product(db=db, product=product)
-
-@app.get("/departaments/", response_model=List[schemas.DepartamentOut], tags=["Departaments"])
-async def read_departaments(skip: int = 0, limit: int = 100, db: AsyncSession = Depends(get_db)):
-    departaments = await crud.get_departaments(db, skip=skip, limit=limit)
-    return departaments
-@app.post("/departaments/", response_model=schemas.DepartamentOut, tags=["Departaments"])
-async def create_departament(departament: schemas.DepartamentCreate, db: AsyncSession = Depends(get_db)):
-    return await crud.create_departament(db=db,departament=departament)

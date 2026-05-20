@@ -16,4 +16,4 @@
 1) "git clone https://github.com/PashaIQinf/Mini-Logistics-Delivery-API.git"
 2) перейти в папку проекта и сделать "docker-compose up --build" для базы данных
 4) "uvicorn app.main:app --reload" для запуска Mini-Logistics-Delivery-API
-# API доступно на http://localhost:8000, docs: http://localhost:8000/docs
+**API доступно на http://localhost:8000, docs: http://localhost:8000/docs**

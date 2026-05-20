@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional, List
+from typing import Optional, List, Literal
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 
 from .models import Gender, Vehicle_type, Order_status
@@ -54,6 +54,19 @@ class OrderCreate(BaseModel):
 class DepartamentCreate(DepartamentBase):
     pass
 
+class UserCreateWithRole(UserBase):
+    #Регистрация с выбором роли
+    password: str = Field(..., min_length=8)
+    role: Literal["admin", "courier", "user"]
+
+    # Поля для админа (опциональные)
+    department_id: Optional[uuid.UUID] = None
+    access_level: Optional[int] = Field(default=1, ge=1, le=5)
+
+    # Поля для курьера (опциональные)
+    vehicle_type: Optional[Vehicle_type] = None
+    vehicle_number: Optional[str] = Field(None, max_length=30)
+
 # --- СХЕМЫ ДЛЯ ВЫВОДА (Out / Read) ---
 
 class UserOut(UserBase):
@@ -90,5 +103,21 @@ class DepartamentOut(DepartamentBase):
     id: uuid.UUID
 
     model_config = ConfigDict(from_attributes=True)
+
+class UserWithRoleOut(UserOut):
+    #Ответ с информацией о роли
+    role: Optional[str] = None
+
+# --- СХЕМЫ ДЛЯ АВТОРИЗАЦИИ ---
+class UserLogin(BaseModel):
+    email: EmailStr
+    password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    role: Optional[str] = None
+
+
 
 

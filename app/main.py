@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 # Импортируем всё наше "лего"
 from .database import engine, Base
 
-from app.routers import users, products, departaments
+from app.routers import users, products, departaments, auth, orders, couriers
 
 
 # 1. Создаем Lifespan функцию
@@ -27,9 +27,12 @@ async def lifespan(fastapi_app: FastAPI):
 
 app = FastAPI(title="Mini-Logistics Delivery API", lifespan=lifespan)
 
+app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(products.router)
 app.include_router(departaments.router)
+app.include_router(orders.router)
+app.include_router(couriers.router)
 
 @app.get("/", tags=["Root/Health"])
 async def root():

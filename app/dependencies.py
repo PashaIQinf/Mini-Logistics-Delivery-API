@@ -1,5 +1,5 @@
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
@@ -7,13 +7,14 @@ from app import crud
 from app.config import settings
 import uuid
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+# Используется HTTPBearer вместо OAuth2PasswordBearer,
+# чтобы сохранить JSON-формат для /auth/login (удобнее для фронтенда и тестов).
+# Для сервера с требованиями OAuth2 можно заменить на OAuth2PasswordBearer.
+security = HTTPBearer()
 
 
-async def get_current_user(
-        token: str = Depends(oauth2_scheme),
-        db: AsyncSession = Depends(get_db)
-):
+async def get_current_user(token: HTTPAuthorizationCredentials = Depends(security), db: AsyncSession = Depends(get_db)):
+    token = token.credentials
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Неверные учетные данные",

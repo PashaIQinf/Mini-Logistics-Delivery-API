@@ -4,8 +4,9 @@ import uuid
 import bcrypt
 from decimal import Decimal
 from typing import Optional, List
-
+from  fastapi import  HTTPException
 from . import models, schemas
+from app.logic.order_fsm import can_transition
 
 def get_password_hash(password: str) -> str:
     # Превращаем пароль в байты, генерируем соль и хэшируем
@@ -59,6 +60,7 @@ async def create_product(db: AsyncSession, product: schemas.ProductCreate) -> mo
     await db.refresh(db_product)
     return db_product
 
+# --- РАБОТА С ЗАКАЗАМИ ---
 
 async def create_order(db: AsyncSession, order_data: schemas.OrderCreate, user_id: uuid.UUID) -> models.Orders:
     # 1. Создаем объект заказа
@@ -90,6 +92,66 @@ async def create_order(db: AsyncSession, order_data: schemas.OrderCreate, user_i
     await db.refresh(new_order)
     return new_order
 
+#Фильтрация заказов по роли и статусу
+async def get_orders_with_filters( db: AsyncSession, current_user, skip: int, limit: int,  status: Optional[models.Order_status] = None) -> List[models.Orders]:
+
+    query = select(models.Orders)
+
+    # Фильтрация по роли
+    if current_user.role == "courier":
+        query = query.where(models.Orders.courier_id == current_user.id)
+    elif current_user.role == "user":
+        query = query.where(models.Orders.user_id == current_user.id)
+    # admin видит всё — без фильтра
+
+    # Фильтрация по статусу
+    if status:
+        query = query.where(models.Orders.status == status)
+
+    query = query.offset(skip).limit(limit).order_by(models.Orders.created_at.desc())
+    result = await db.execute(query)
+    return result.scalars().all()
+
+async def get_order_by_id(db: AsyncSession, order_id: uuid.UUID) -> Optional[models.Orders]:
+    #Получить заказ по ID
+    return await db.get(models.Orders, order_id)
+
+async def update_order_status(db: AsyncSession, order_id: uuid.UUID, status_update: schemas.OrderStatusUpdate, current_user) -> models.Orders:
+
+    order = await db.get(models.Orders, order_id)
+    if not order:
+        raise HTTPException(404, "Заказ не найден")
+
+    # 1. Валидация перехода (бизнес-логика)
+    if not can_transition(order.status, status_update.new_status):
+        raise HTTPException(
+            400,
+            f"Невозможно перейти из '{order.status.value}' в '{status_update.new_status.value}'"
+        )
+
+    # 2. Проверка прав на изменение статуса
+    if current_user.role == "courier" and order.courier_id != current_user.id:
+        raise HTTPException(403, "Вы не можете менять статус этого заказа")
+
+    # 3. Обновляем статус
+    old_status = order.status
+    order.status = status_update.new_status
+
+    # 4. Записываем историю
+    history = models.StatusHistory(
+        order_id=order.id,
+        previous_status=old_status,
+        new_status=status_update.new_status,
+        changed_by=current_user.id,
+        comment=status_update.comment
+    )
+    db.add(history)
+
+    await db.commit()
+    await db.refresh(order)
+    return order
+
+
 # --- РАБОТА С ДЕПАРТАМЕНТАМИ    ---
 async def create_departament(db:AsyncSession, departament: schemas.DepartamentCreate) -> models.Departaments:
     data = departament.model_dump()
@@ -102,7 +164,6 @@ async def create_departament(db:AsyncSession, departament: schemas.DepartamentCr
 async def get_departaments(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[models.Departaments]:
     result = await db.execute(select(models.Departaments).offset(skip).limit(limit))
     return result.scalars().all()
-
 
 # --- РАБОТА C АВТОРИЗАЦИЕЙ И РОЛЯМИ ---
 

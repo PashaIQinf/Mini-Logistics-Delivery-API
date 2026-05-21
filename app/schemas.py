@@ -108,6 +108,32 @@ class UserWithRoleOut(UserOut):
     #Ответ с информацией о роли
     role: Optional[str] = None
 
+# Схема для обновления статуса заказа.
+class OrderStatusUpdate(BaseModel):
+    new_status: Order_status
+    comment: Optional[str] = Field(None, max_length=500)
+
+    model_config = ConfigDict(from_attributes=True, extra="forbid"  )
+
+# История изменения статуса заказ
+class StatusHistoryOut(BaseModel):
+    id: uuid.UUID
+    order_id: uuid.UUID
+    previous_status: Order_status
+    new_status: Order_status
+    changed_by: Optional[uuid.UUID] = None
+    changed_at: datetime
+    comment: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Расширенный ответ заказа с историей статусов
+class OrderOutWithHistory(OrderOut):
+    status_history: List[StatusHistoryOut] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
 # --- СХЕМЫ ДЛЯ АВТОРИЗАЦИИ ---
 class UserLogin(BaseModel):
     email: EmailStr

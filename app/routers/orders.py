@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException,status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from app.database import get_db
@@ -8,7 +8,7 @@ import uuid
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
 
-@router.post("/", response_model=schemas.OrderOut, status_code=201)
+@router.post("/", response_model=schemas.OrderOut, status_code=status.HTTP_201_CREATED)
 async def create_order(order: schemas.OrderCreate, db: AsyncSession = Depends(get_db), current_user = Depends(get_current_user)):
     return await crud.create_order(db, order, current_user.id)
 

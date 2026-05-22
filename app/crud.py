@@ -4,7 +4,7 @@ import uuid
 import bcrypt
 from decimal import Decimal
 from typing import Optional, List
-from  fastapi import  HTTPException
+from  fastapi import  HTTPException, status
 from . import models, schemas
 from app.logic.order_fsm import can_transition
 
@@ -63,31 +63,53 @@ async def create_product(db: AsyncSession, product: schemas.ProductCreate) -> mo
 # --- РАБОТА С ЗАКАЗАМИ ---
 
 async def create_order(db: AsyncSession, order_data: schemas.OrderCreate, user_id: uuid.UUID) -> models.Orders:
-    # 1. Создаем объект заказа
+    # 1. Проверяем и получаем все товары из БД
+    product_ids = [item.product_id for item in order_data.items]
+    products_result = await db.execute(select(models.Products).where(models.Products.id.in_(product_ids)))
+    products = {str(product.id): product for product in products_result.scalars().all()}
+
+    # Проверяем, все ли товары найдены
+    missing_products = [str(pid) for pid in product_ids if str(pid) not in products]
+    if missing_products:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Товары не найдены: {', '.join(missing_products)}"
+        )
+    # 2. Создаем объект заказа
     new_order = models.Orders(
         user_id=user_id,
         address_from=order_data.address_from,
         address_to=order_data.address_to,
-        price=order_data.price,
+        price=Decimal("0.00"),
         status=models.Order_status.CREATED
     )
     db.add(new_order)
     await db.flush()  # Получаем ID заказа, не закрывая транзакцию
 
-    # 2. Добавляем товары в заказ
+    # 3. Добавляем товары в заказ
+    total_price = Decimal("0.00")
+
     for item in order_data.items:
-        # Получаем актуальную цену товара из базы
-        res = await db.execute(select(models.Products).where(models.Products.id == item.product_id))
-        product = res.scalar_one()
+        product = products[str(item.product_id)]
+        # Получаем актуальную цену товара
+        price_at_purchase = product.price
+
+        # Сумма для этой позиции
+        item_total = price_at_purchase * item.quantity
+        total_price += item_total
 
         db_item = models.OrderItems(
             order_id=new_order.id,
             product_id=item.product_id,
             quantity=item.quantity,
-            price_at_purchase=product.price  # Фиксируем цену на момент покупки!
+            price_at_purchase=price_at_purchase
         )
         db.add(db_item)
 
+    # 4. Обновляем общую сумму заказа
+    new_order.price = total_price.quantize(Decimal("0.01"))  # округление до копеек
+
+    # 5. Фиксируем всё в БД
     await db.commit()
     await db.refresh(new_order)
     return new_order

@@ -43,13 +43,12 @@ class ProductCreate(ProductBase):
 
 class OrderItemCreate(BaseModel):
     product_id: uuid.UUID
-    quantity: int = Field(..., gt=0)
+    quantity: int = Field(..., ge=1)
 
 class OrderCreate(BaseModel):
-    address_from: str
-    address_to: str
-    price: Decimal = Field(..., gt=0)
-    items: List[OrderItemCreate]
+    address_from: str = Field(...,  min_length=5, max_length=255)
+    address_to: str = Field(...,  min_length=5, max_length=255)
+    items: List[OrderItemCreate] = Field(..., min_length=1)
 
 class DepartamentCreate(DepartamentBase):
     pass
@@ -88,6 +87,16 @@ class ProductOut(ProductBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+
+class OrderItemOut(BaseModel):
+    id: uuid.UUID
+    order_id: uuid.UUID
+    product_id: uuid.UUID
+    quantity: int
+    price_at_purchase: Decimal
+
+    model_config = ConfigDict(from_attributes=True)
+
 class OrderOut(BaseModel):
     id: uuid.UUID
     status: Order_status
@@ -96,7 +105,8 @@ class OrderOut(BaseModel):
     address_to: str
     created_at: datetime
     user_id: uuid.UUID
-    courier_id: Optional[uuid.UUID]
+    courier_id: Optional[uuid.UUID] = None
+    items: List[OrderItemOut] = []
 
     model_config = ConfigDict(from_attributes=True)
 class DepartamentOut(DepartamentBase):

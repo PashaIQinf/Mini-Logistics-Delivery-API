@@ -38,3 +38,39 @@ async def get_order(order_id: uuid.UUID, db: AsyncSession = Depends(get_db), cur
 @router.patch("/{order_id}/status", response_model=schemas.OrderOut)
 async def update_order_status(order_id: uuid.UUID, status_update: schemas.OrderStatusUpdate, db: AsyncSession = Depends(get_db), current_user = Depends(get_current_user)):
     return await crud.update_order_status(db, order_id, status_update, current_user)
+
+@router.get("/{order_id}/history", response_model=schemas.OrderOutWithHistory)
+async def get_order_history(order_id: uuid.UUID, skip: int = 0, limit: int = 100,  db: AsyncSession = Depends(get_db), current_user = Depends(get_current_user)):
+    order = await crud.get_order_by_id(db, order_id)
+    if not order:
+        raise HTTPException(404, "Заказ не найден")
+
+    if current_user.role == "user" and order.user_id != current_user.id:
+        raise HTTPException(403, "Доступ запрещён")
+    if current_user.role == "courier" and order.courier_id != current_user.id and order.user_id != current_user.id:
+        raise HTTPException(403, "Доступ запрещён")
+
+    status_history = await crud.get_status_history_by_id(db, skip, limit, order_id)
+
+    order.status_history = status_history
+    return order
+
+@router.get("/{order_id}/products", response_model=list[schemas.OrderProductOut])
+async def get_order_products(order_id: uuid.UUID, skip: int = 0, limit: int = 100,  db: AsyncSession = Depends(get_db), current_user = Depends(get_current_user)):
+    order = await crud.get_order_by_id(db, order_id)
+    if not order:
+        raise HTTPException(404, "Заказ не найден")
+
+    if current_user.role == "user" and order.user_id != current_user.id:
+        raise HTTPException(403, "Доступ запрещён")
+    if current_user.role == "courier" and order.courier_id != current_user.id and order.user_id != current_user.id:
+        raise HTTPException(403, "Доступ запрещён")
+
+    products = await crud.get_products_with_filters(db, order, skip, limit)
+
+    return products
+
+
+
+
+

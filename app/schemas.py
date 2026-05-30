@@ -20,7 +20,6 @@ class UserBase(BaseModel):
 class ProductBase(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: str
-    price: Decimal = Field(..., gt=0)
     weight: Optional[Decimal] = Field(None, ge=0)
 class DepartamentBase(BaseModel):
     name: str = Field(..., min_length=2, max_length=100)
@@ -29,9 +28,6 @@ class DepartamentBase(BaseModel):
 
 # --- СХЕМЫ ДЛЯ СОЗДАНИЯ (Create) ---
 
-class UserCreate(UserBase):
-    password: str = Field(..., min_length=8)
-
 
 class CourierCreate(BaseModel):
     user_id: uuid.UUID # Сначала создаем User, потом берем ID для создания Courier
@@ -39,7 +35,7 @@ class CourierCreate(BaseModel):
     vehicle_number: str = Field(..., max_length=30)
 
 class ProductCreate(ProductBase):
-    pass
+    price: Decimal = Field(..., gt=0)
 
 class OrderItemCreate(BaseModel):
     product_id: uuid.UUID
@@ -84,6 +80,7 @@ class CourierOut(CourierCreate):
 
 class ProductOut(ProductBase):
     id: uuid.UUID
+    price: Decimal = Field(..., gt=0)
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -92,6 +89,13 @@ class OrderItemOut(BaseModel):
     id: uuid.UUID
     order_id: uuid.UUID
     product_id: uuid.UUID
+    quantity: int
+    price_at_purchase: Decimal
+
+    model_config = ConfigDict(from_attributes=True)
+
+class OrderProductOut(ProductBase):
+    id: uuid.UUID
     quantity: int
     price_at_purchase: Decimal
 

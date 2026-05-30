@@ -5,6 +5,8 @@ import bcrypt
 from decimal import Decimal
 from typing import Optional, List
 from  fastapi import  HTTPException, status
+from sqlalchemy.orm import joinedload, selectinload
+
 from . import models, schemas
 from app.logic.order_fsm import can_transition
 
@@ -21,30 +23,6 @@ async def get_user_by_email(db: AsyncSession, email: str) -> Optional[models.Use
     result = await db.execute(select(models.Users).where(models.Users.email == email))
     return result.scalar_one_or_none()
 
-
-async def create_user(db: AsyncSession, user: schemas.UserCreate) -> models.Users:
-    # 1. Хэшируем пароль
-    hashed_pass = get_password_hash(user.password)
-
-    # 2. Создаем модель SQLAlchemy (превращаем данные из схемы в данные для базы)
-    db_user = models.Users(
-        email=user.email,
-        hashed_password=hashed_pass,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        middle_name=user.middle_name,
-        phone_number=user.phone_number,
-        gender=user.gender,
-        birth_date=user.birth_date
-    )
-
-    # 3. Добавляем в сессию и сохраняем
-    db.add(db_user)
-    await db.commit()
-    await db.refresh(db_user)  # Чтобы получить ID, созданный базой
-    return db_user
-
-
 # --- РАБОТА С ТОВАРАМИ ---
 
 async def get_products(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[models.Products]:
@@ -59,6 +37,26 @@ async def create_product(db: AsyncSession, product: schemas.ProductCreate) -> mo
     await db.commit()
     await db.refresh(db_product)
     return db_product
+
+
+async def get_products_with_filters(db: AsyncSession, order: schemas.OrderOut, skip: int, limit: int) -> List[models.Products]:
+    # Создаем быстрый словарь {product_id: item(объект)} из уже загруженных данных
+    items_map = {item.product_id: item for item in order.items}
+    product_ids = list(items_map.keys())
+
+    query = select(models.Products).where(models.Products.id.in_(product_ids)).offset(skip).limit(limit)
+
+    query = await db.execute(query)
+    products = query.scalars().all()
+
+    for product in products:
+        corresponding_item = items_map.get(product.id)
+        if corresponding_item:
+            product.quantity = corresponding_item.quantity
+            product.price_at_purchase = corresponding_item.price_at_purchase
+
+    return products
+
 
 # --- РАБОТА С ЗАКАЗАМИ ---
 
@@ -130,13 +128,25 @@ async def get_orders_with_filters( db: AsyncSession, current_user, skip: int, li
     if status:
         query = query.where(models.Orders.status == status)
 
-    query = query.offset(skip).limit(limit).order_by(models.Orders.created_at.desc())
-    result = await db.execute(query)
-    return result.scalars().all()
+    query = query.options(selectinload(models.Orders.order_list)).offset(skip).limit(limit).order_by(models.Orders.created_at.desc())
+    orders   = await db.execute(query)
+    result = orders.scalars().all()
+
+    for order in result:
+        order.items = order.order_list
+
+    return result
 
 async def get_order_by_id(db: AsyncSession, order_id: uuid.UUID) -> Optional[models.Orders]:
     #Получить заказ по ID
-    return await db.get(models.Orders, order_id)
+    order = await db.get(models.Orders, order_id, options=[joinedload(models.Orders.order_list)])
+
+    if order:
+        order.items = order.order_list
+
+    return order
+
+# --- РАБОТА С СТАТУСОМ, ИСТОРИЕЙ И ПРОДУКТАМИ ЗАКАЗА ---
 
 async def update_order_status(db: AsyncSession, order_id: uuid.UUID, status_update: schemas.OrderStatusUpdate, current_user) -> models.Orders:
 
@@ -172,6 +182,14 @@ async def update_order_status(db: AsyncSession, order_id: uuid.UUID, status_upda
     await db.commit()
     await db.refresh(order)
     return order
+
+async def get_status_history_by_id(db: AsyncSession, skip: int, limit: int, order_id: uuid.UUID) ->   List[models.StatusHistory]:
+    query = select(models.StatusHistory).where(models.StatusHistory.order_id == order_id)
+
+    query = query.offset(skip).limit(limit).order_by(models.StatusHistory.changed_at.desc())
+
+    result = await db.execute(query)
+    return result.scalars().all()
 
 
 # --- РАБОТА С ДЕПАРТАМЕНТАМИ    ---

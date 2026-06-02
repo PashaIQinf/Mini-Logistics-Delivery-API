@@ -23,6 +23,59 @@ async def get_user_by_email(db: AsyncSession, email: str) -> Optional[models.Use
     result = await db.execute(select(models.Users).where(models.Users.email == email))
     return result.scalar_one_or_none()
 
+# --- РАБОТА С КУРЬЕРАМИ ---
+
+async def get_courier_active_orders(db: AsyncSession, courier: schemas.CourierOut) -> List[models.Orders]:
+    # Получить активные заказы курьера
+    courier_orders = await db.execute(select(models.Orders)
+        .where(models.Orders.courier_id == courier.id, models.Orders.status == models.Order_status.IN_DELIVERY)
+        .options(selectinload(models.Orders.order_list))
+        .order_by(models.Orders.created_at.desc())
+    )
+    result = courier_orders.scalars().all()
+
+    for order in result:
+        order.items = order.order_list
+
+    return result
+
+
+async def accept_order_by_courier(db: AsyncSession, order_id: uuid.UUID, courier: schemas.CourierOut) -> models.Orders:
+    # Курьер принимает заказ со статусом SEARCHING
+
+    order = await db.get(models.Orders, order_id, options=[joinedload(models.Orders.order_list)])
+    if not order:
+        raise HTTPException(404, "Заказ не найден")
+
+    # Валидация: можно принять только заказ в поиске
+    if order.status != models.Order_status.SEARCHING:
+        raise HTTPException(400, "Заказ нельзя принять (не в статусе поиска)")
+
+    # Валидация: курьер ещё не назначен
+    if order.courier_id is not None:
+        raise HTTPException(400, "Заказ уже назначен другому курьеру")
+
+    # Обновляем заказ
+    order.courier_id = courier.id
+    order.status = models.Order_status.IN_DELIVERY
+
+    # Записываем в историю
+    history = models.StatusHistory(
+        order_id=order.id,
+        previous_status=models.Order_status.SEARCHING,
+        new_status=models.Order_status.IN_DELIVERY,
+        changed_by=courier.user_id,
+        comment="Заказ принят курьером"
+    )
+    db.add(history)
+
+    if order:
+        order.items = order.order_list
+
+    await db.commit()
+    await db.refresh(order)
+    return order
+
 # --- РАБОТА С ТОВАРАМИ ---
 
 async def get_products(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[models.Products]:
@@ -273,3 +326,13 @@ async def get_user_role(db: AsyncSession, user_id: uuid.UUID) -> Optional[str]:
 async def get_user_by_id(db: AsyncSession, user_id: uuid.UUID) -> Optional[models.Users]:
     #Получить пользователя по ID
     return await db.get(models.Users, user_id)
+
+async def get_courier_by_user_id(db: AsyncSession, user_id: uuid.UUID) -> Optional[models.Couriers]:
+    #Получить курьера по ID
+    result = await db.execute(select(models.Couriers).where(models.Couriers.user_id == user_id))
+
+    return result.scalar_one_or_none()
+
+async def get_couriers(db: AsyncSession, skip: int = 0, limit: int = 100) -> List[models.Couriers]:
+    result = await db.execute(select(models.Couriers).offset(skip).limit(limit))
+    return result.scalars().all()

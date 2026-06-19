@@ -8,7 +8,7 @@ from app.database import Base, get_db
 from app.config import  settings
 
 
-TEST_DATABASE_URL = "postgresql+asyncpg://test_user:test_pass@localhost:5433/test_mini_logistics"
+TEST_DATABASE_URL = settings.TEST_DATABASE_URL
 
 settings.TESTING = True
 

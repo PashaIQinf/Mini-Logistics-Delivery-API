@@ -41,7 +41,7 @@ jobs:
         run: |
           # ✅ Создаём .env с правильным портом 5433
           cat > .env << 'EOF'
-          DATABASE_URL=postgresql+asyncpg://admin:pass2005%40P@localhost:5432/mini_logistics
+          DATABASE_URL=postgresql+asyncpg://test_user:test_pass@localhost:5433/test_mini_logistics
           TEST_DATABASE_URL=postgresql+asyncpg://test_user:test_pass@localhost:5433/test_mini_logistics
           SECRET_KEY=ci-cd-test-secret-key-not-for-production
           ALGORITHM=HS256

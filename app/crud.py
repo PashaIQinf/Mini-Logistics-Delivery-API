@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, exists
+from sqlalchemy import select
 import uuid
 import bcrypt
 from decimal import Decimal
@@ -216,6 +216,8 @@ async def update_order_status(db: AsyncSession, order_id: uuid.UUID, status_upda
 
     # 2. Проверка прав на изменение статуса
     if current_user.role == "courier" and order.courier_id != current_user.id:
+        raise HTTPException(403, "Вы не можете менять статус этого заказа")
+    elif current_user.role == "user" and order.user_id != current_user.id:
         raise HTTPException(403, "Вы не можете менять статус этого заказа")
 
     # 3. Обновляем статус

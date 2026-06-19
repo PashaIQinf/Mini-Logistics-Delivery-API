@@ -1,7 +1,5 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
-
 
 # Импортируем всё наше "лего"
 from .database import engine, Base

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import IntegrityError
 from app.database import get_db
 from app import schemas, crud, utils
 from app.config import settings
@@ -11,13 +12,18 @@ router = APIRouter(prefix="/auth", tags=["Authentication"])
 @router.post("/register", response_model=schemas.UserWithRoleOut, status_code=201)
 async def register(user_data: schemas.UserCreateWithRole, db: AsyncSession = Depends(get_db)):
     # Проверка на дубликаты
-    if await crud.get_user_by_email(db, user_data.email):
+    existing_user = await crud.get_user_by_email(db, email=user_data.email)
+    if existing_user:
         raise HTTPException(400, "Email уже зарегистрирован")
 
     try:
         user = await crud.create_user_with_role(db, user_data)
         user.role = user_data.role
         return user
+    except IntegrityError:
+        # Защита от race condition
+        await db.rollback()
+        raise HTTPException(400, "Email уже зарегистрирован")
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception:

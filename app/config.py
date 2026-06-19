@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
 
+    TESTING: bool = False
+
     model_config = SettingsConfigDict(
         env_file=Path(__file__).parent.parent / ".env",  # ищет .env в корне проекта
         env_file_encoding="utf-8",
